@@ -1,0 +1,25 @@
+{
+    "videos": [
+      {
+        "id": 1,
+        "title": "Introduction to AI",
+        "duration": "12:34",
+        "thumbnail": "https://via.placeholder.com/100",
+        "timestamp": "2023-07-15"
+      },
+      {
+        "id": 2,
+        "title": "React Tutorial",
+        "duration": "08:45",
+        "thumbnail": "https://via.placeholder.com/100",
+        "timestamp": "2023-07-16"
+      },
+      {
+        "id": 3,
+        "title": "JavaScript Basics",
+        "duration": "15:20",
+        "thumbnail": "https://via.placeholder.com/100",
+        "timestamp": "2023-07-17"
+      }
+    ]
+  }

@@ -1,121 +1,100 @@
-import { createContext, useState } from 'react';
-
+import { createContext, useState, useRef, useCallback } from 'react';
 import { runChat } from '@/libs/gemini';
 
 type ChatContextProps = {
-	sendPrompt: (prompt: string) => Promise<void>;
-	setPrevPrompts: React.Dispatch<React.SetStateAction<string[]>>;
-	setRecentPrompt: React.Dispatch<React.SetStateAction<string>>;
-	setPrompt: React.Dispatch<React.SetStateAction<string>>;
-	startNewChat: () => void;
-	prevPrompts: string[];
-	recentPrompt: string;
-	prompt: string;
-	isPending: boolean;
-	isGenerating: boolean;
-	output: string;
-	showResult: boolean;
+    sendPrompt: (prompt: string) => Promise<void>;
+    setPrevPrompts: React.Dispatch<React.SetStateAction<string[]>>;
+    setRecentPrompt: React.Dispatch<React.SetStateAction<string>>;
+    setPrompt: React.Dispatch<React.SetStateAction<string>>;
+    startNewChat: () => void;
+    prevPrompts: string[];
+    recentPrompt: string;
+    prompt: string;
+    isPending: boolean;
+    isGenerating: boolean;
+    output: string;
+    showResult: boolean;
 };
 
-export const ChatContext = createContext<ChatContextProps>({
-	sendPrompt: async () => {},
-	setPrevPrompts: () => {},
-	setRecentPrompt: () => {},
-	setPrompt: () => {},
-	startNewChat: () => {},
-	prevPrompts: [],
-	recentPrompt: '',
-	prompt: '',
-	isPending: false,
-	isGenerating: false,
-	output: '',
-	showResult: false,
-});
+export const ChatContext = createContext<ChatContextProps>({} as ChatContextProps);
 
 export const ChatContextProvider = ({ children }: React.PropsWithChildren) => {
-	const [prevPrompts, setPrevPrompts] = useState<string[]>([]);
-	const [recentPrompt, setRecentPrompt] = useState<string>('');
-	const [prompt, setPrompt] = useState<string>('');
-	const [isPending, setIsPending] = useState<boolean>(false);
-	const [isGenerating, setIsGenerating] = useState<boolean>(false);
-	const [output, setOutput] = useState<string>('');
-	const [showResult, setShowResult] = useState<boolean>(false);
+    const [prevPrompts, setPrevPrompts] = useState<string[]>([]);
+    const [recentPrompt, setRecentPrompt] = useState('');
+    const [prompt, setPrompt] = useState('');
+    const [isPending, setIsPending] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [output, setOutput] = useState('');
+    const [showResult, setShowResult] = useState(false);
+    const typingTimeout = useRef<NodeJS.Timeout[]>([]);
 
-	const handleNewChat = () => {
-		setRecentPrompt('');
-		setOutput('');
-		setShowResult(false);
-	};
+    const startNewChat = useCallback(() => {
+        setRecentPrompt('');
+        setOutput('');
+        setPrompt('');
+        setIsPending(false);
+        setIsGenerating(false);
+        setShowResult(false);
+        typingTimeout.current.forEach(clearTimeout);
+        typingTimeout.current = [];
+    }, []);
 
-	const handleSendPrompt = async (prompt: string) => {
-		setIsGenerating(true);
-		setIsPending(true);
-		setRecentPrompt(prompt);
-		setShowResult(true);
+    const sendPrompt = useCallback(async (prompt: string) => {
+        try {
+            setIsGenerating(true);
+            setIsPending(true);
+            setRecentPrompt(prompt);
+            setShowResult(true);
 
-		setPrevPrompts((prev) => [...prev.filter((p) => p !== prompt), prompt]);
+            setPrevPrompts(prev => [...prev.filter(p => p !== prompt), prompt]);
 
-		const { data, error } = await runChat(prompt);
-		let formattedResponse = '';
+            const { data, error } = await runChat(prompt);
+            if (error) throw new Error(error);
 
-		if (error) {
-			setOutput(`<span class="text-red-500">${error}</span>`);
-			setIsPending(false);
-			setIsGenerating(false);
-			setShowResult(true);
+            const formattedResponse = data!
+                .split('**')
+                .map((word, idx) => idx % 2 ? `<strong>${word}</strong>` : word)
+                .join('')
+                .split('*')
+                .join('<br />');
 
-			return;
-		}
+            setOutput('');
+            const words = formattedResponse.split(' ');
+            
+            typingTimeout.current = words.map((word, idx) => 
+                setTimeout(() => {
+                    setOutput(prev => prev + word + ' ');
+                }, 40 * idx)
+            );
 
-		data!.split('**').forEach((word, idx) => {
-			if (idx === 0 || idx % 2 === 0) {
-				formattedResponse += word;
-			} else {
-				formattedResponse += `<strong>${word}</strong>`;
-			}
-		});
+        } catch (error) {
+            setOutput(`<span class="text-red-500">${
+                error instanceof Error ? error.message : 'An error occurred'
+            }</span>`);
+        } finally {
+            setIsPending(false);
+            setIsGenerating(false);
+        }
+    }, []);
 
-		formattedResponse = formattedResponse.split('*').join('<br />');
-
-		setOutput('');
-		setIsPending(false);
-
-		await Promise.all(
-			formattedResponse
-				.split(' ')
-				.map((word, idx) => simulateTypingEffect(idx, word + ' ')),
-		);
-
-		setPrompt('');
-		setIsGenerating(false);
-	};
-
-	const simulateTypingEffect = (idx: number, nextWord: string): Promise<void> =>
-		new Promise((resolve) =>
-			setTimeout(() => {
-				setOutput((prev) => prev + nextWord);
-				resolve();
-			}, 40 * idx),
-		);
-
-	return (
-		<ChatContext.Provider
-			value={{
-				sendPrompt: handleSendPrompt,
-				setPrevPrompts,
-				setRecentPrompt,
-				setPrompt,
-				startNewChat: handleNewChat,
-				prevPrompts,
-				recentPrompt,
-				prompt,
-				isPending,
-				isGenerating,
-				output,
-				showResult,
-			}}
-		>
-			{children}
-		</ChatContext.Provider>
-	);
+    return (
+        <ChatContext.Provider
+            value={{
+                sendPrompt,
+                setPrevPrompts,
+                setRecentPrompt,
+                setPrompt,
+                startNewChat,
+                prevPrompts,
+                recentPrompt,
+                prompt,
+                isPending,
+                isGenerating,
+                output,
+                showResult,
+            }}
+        >
+            {children}
+        </ChatContext.Provider>
+    );
 };
