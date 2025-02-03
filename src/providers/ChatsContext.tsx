@@ -1,5 +1,4 @@
 import { createContext, useState, useRef, useCallback } from 'react';
-import { runChat } from '@/libs/gemini';
 
 type ChatContextProps = {
     sendPrompt: (prompt: string) => Promise<void>;
@@ -45,13 +44,12 @@ export const ChatContextProvider = ({ children }: React.PropsWithChildren) => {
             setIsPending(true);
             setRecentPrompt(prompt);
             setShowResult(true);
-
             setPrevPrompts(prev => [...prev.filter(p => p !== prompt), prompt]);
 
-            const { data, error } = await runChat(prompt);
-            if (error) throw new Error(error);
+            // Mock response generation
+            const mockResponse = `**Mock Response**\n\nHere is a simulated answer to: "${prompt}".\n\n*This is a generated mock response*\n\n**Features**:\n- No API dependencies\n- Simulated typing effect\n- Error handling demonstration`;
 
-            const formattedResponse = data!
+            const formattedResponse = mockResponse
                 .split('**')
                 .map((word, idx) => idx % 2 ? `<strong>${word}</strong>` : word)
                 .join('')
@@ -64,7 +62,7 @@ export const ChatContextProvider = ({ children }: React.PropsWithChildren) => {
             typingTimeout.current = words.map((word, idx) => 
                 setTimeout(() => {
                     setOutput(prev => prev + word + ' ');
-                }, 40 * idx)
+                }, Math.random() * 40 + 20) // Random typing speed between 20-60ms
             );
 
         } catch (error) {
